@@ -18,7 +18,7 @@ jobs:
 
       - name: Run server
         run: |
-        python httpd.py
+          python httpd.py
       - name: Run test
         run: |
-        python httptest.py
+          python httptest.py
