@@ -16,8 +16,9 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Run test suite
-        run:
+      - name: Run server
+        run: |
         python httpd.py
-        |
+      - name: Run test
+        run: |
         python httptest.py
