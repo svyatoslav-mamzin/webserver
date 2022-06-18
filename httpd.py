@@ -95,7 +95,7 @@ class HelloServer:
         logging.debug(f'{worker_key} : THREAD {thread_key} : STARTED NEW THREAD FOR {address}')
         try:
             logging.debug(f'{worker_key} : THREAD {thread_key} : GETTING DATA')
-            data = self._read(client)
+            data = client.recv(self.read_size)
         except OSError:
             logging.info(f'{worker_key} : THREAD {thread_key} : CLIENT DISCONNECTED, EXITING')
             client.close()
@@ -108,10 +108,6 @@ class HelloServer:
             return True
         else:
             raise socket.error('Client disconnected')
-
-    def _read(self, client):
-        data = client.recv(self.read_size)
-        return data
 
     def get_response(self, data: bytes) -> bytes:
         data = data.decode()
