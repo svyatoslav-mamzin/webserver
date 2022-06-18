@@ -244,26 +244,24 @@ class HTTPServer(HelloServer):
                f"Content-Length: {content_length}\r\n" \
                f"Content-Type: {content_type}\n\n"
 
-    def wrap_response(self, status: int, html: bytes, content_type='text/html', is_head=False):
-        headers = self._gen_headers(status, len(html), content_type)
-        response = headers.encode() + html if not is_head else headers.encode() + b'\r\n\r\n'
-        logging.debug(f'RESPONSE HEADERS IS: {headers}')
-        return response
-
     def get_response(self, data):
         headers, error = self._get_headers(data)
         if error:
             status, text = error
-            return self.wrap_response(status, HTML_ERROR.format(status=status, text=text).encode())
+            html_err = HTML_ERROR.format(status=status, text=text).encode() + b'\r\n\r\n'
+            return self._gen_headers(status, len(html_err), 'text/html').encode() + html_err
         path, query = self.resolve_path(headers['path'])
         content_type, _ = mimetypes.guess_type(path)
+
+        if headers['command'] == 'HEAD':
+            return self._gen_headers(OK, len(self.get_html_from_path(path)), content_type).encode() + b'\r\n\r\n'
+
         html = self.get_html_from_path(path)
-        is_head = headers['command'] == 'HEAD'
         if html:
-            return self.wrap_response(OK, html, content_type=content_type, is_head=is_head)
-        else:
-            return self.wrap_response(NOT_FOUND, HTML_ERROR.format(status=NOT_FOUND, text='Page not found').encode(),
-                                      is_head=is_head)
+            return self._gen_headers(OK, len(html), content_type).encode() + html
+
+        html_err = HTML_ERROR.format(status=NOT_FOUND, text='Page not found').encode()
+        return self._gen_headers(NOT_FOUND, len(html_err), 'text/html').encode() + html_err
 
 
 def create_parser() -> argparse.ArgumentParser:
