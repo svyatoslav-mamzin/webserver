@@ -65,7 +65,6 @@ class HelloServer:
             logging.info(f"ERROR: Failed to acquire sockets for port {self.port}")
             logging.info("Try running the Server in a privileged user mode.")
             self.shutdown()
-            import sys
             sys.exit(1)
 
         logging.info(f"Server successfully acquired the socket with port: {self.port}")
