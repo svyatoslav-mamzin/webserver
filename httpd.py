@@ -223,8 +223,6 @@ class HTTPServer(Server):
         query = ''
         if '?' in path:
             path, query = path.split('?')
-        if '../' in path:
-            return '', ''
         if '%' in path:
             path = unquote(path)
         if path == '/':
@@ -233,6 +231,8 @@ class HTTPServer(Server):
             path = self.document_root + path
         if os.path.isdir(path):
             path = os.path.join(path, 'index.html')  # 'htm' extension is not supported
+        if DOCUMENT_ROOT not in os.path.abspath(path):
+            return '', ''
         logging.debug(f'RESOLVED PATH: {path}')
         return path, query
 
