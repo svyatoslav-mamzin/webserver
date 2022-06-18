@@ -8,7 +8,7 @@ import signal
 import logging
 import time
 import os
-from urlparse import unquote
+from urllib.parse import unquote
 import argparse
 
 logging.basicConfig(format='[%(asctime)s] %(levelname).1s %(message)s',
