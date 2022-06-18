@@ -2,13 +2,12 @@
 import mimetypes
 import socket
 import threading
-import string
-import random
 import sys
 import signal
 import logging
 import time
 import os
+import uuid
 from urllib.parse import unquote
 import argparse
 
@@ -71,16 +70,12 @@ class HelloServer:
         logging.info("Press Ctrl+C to shut down the server and exit.")
         logging.debug('STARTING WORKERS')
         for _ in range(self.workers):
-            key = self._get_key()
-            worker_key = f'WORKER_{key}'
+            worker_key = f'WORKER {uuid.uuid1()}'
             logging.info(f'Starting worker with key: {worker_key}')
             t = threading.Thread(target=self._listen, args=(worker_key,))
             t.start()
             self.opened_threads.append(t)
         logging.debug('WORKERS STARTED')
-
-    def _get_key(self):
-        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(5))
 
     def _listen(self, worker_key):
         self.sock.listen(5)
