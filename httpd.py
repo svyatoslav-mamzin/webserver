@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import mimetypes
 import socket
 import threading
 import string
@@ -259,29 +260,13 @@ class HTTPServer(HelloServer):
         logging.debug(f'RESPONSE HEADERS IS: {headers}')
         return response
 
-    def get_content_type(self, path: str):
-        ctypes = {
-            '.html': 'text/html',
-            '.css': 'text/css',
-            '.js': 'text/javascript',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.swf': 'application/x-shockwave-flash',
-        }
-        for ext, mtype in ctypes.items():
-            if path.endswith(ext):
-                return mtype
-        return ctypes['.html']
-
     def get_response(self, data):
         headers, error = self._get_headers(data)
         if error:
             status, text = error
             return self.wrap_response(status, HTML_ERROR.format(status=status, text=text).encode())
         path, query = self.resolve_path(headers['path'])
-        content_type = self.get_content_type(path)
+        content_type, _ = mimetypes.guess_type(path)
         html = self.get_html_from_path(path)
         is_head = headers['command'] == 'HEAD'
         if html:
