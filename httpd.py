@@ -40,7 +40,7 @@ HTML_ERROR = """<html>
 """
 
 
-class HelloServer:
+class Server:
     """
     Simply TCP Server:
     request: "My name is Svyatoslav"
@@ -60,7 +60,7 @@ class HelloServer:
         logging.info(f"Launching HTTP server on {self.host} : {self.port}")
         try:
             self.sock.bind((self.host, self.port))
-        except Exception as e:
+        except Exception:
             logging.info(f"ERROR: Failed to acquire sockets for port {self.port}")
             logging.info("Try running the Server in a privileged user mode.")
             self.shutdown()
@@ -79,7 +79,7 @@ class HelloServer:
 
     def _listen(self, worker_key):
         self.sock.listen(5)
-        t = threading.currentThread()
+        threading.currentThread()
         while True:
             logging.debug(f'{worker_key}: ACCEPTING')
             try:
@@ -89,9 +89,9 @@ class HelloServer:
             logging.debug(f'{worker_key}: ADDRESS: {address}')
             logging.debug(f'{worker_key}: SET TIMEOUT')
             client.settimeout(10)
-            self.listen_to_client(client, address, worker_key, ' ')
+            self._listen_to_client(client, address, worker_key, ' ')
 
-    def listen_to_client(self, client, address, worker_key,  thread_key):
+    def _listen_to_client(self, client, address, worker_key,  thread_key):
         logging.debug(f'{worker_key} : THREAD {thread_key} : STARTED NEW THREAD FOR {address}')
         try:
             logging.debug(f'{worker_key} : THREAD {thread_key} : GETTING DATA')
@@ -105,7 +105,6 @@ class HelloServer:
             client.sendall(response)
             logging.info(f'{worker_key} : THREAD {thread_key} : RESPONSE SENDED, EXITING')
             client.close()
-            return True
         else:
             raise socket.error('Client disconnected')
 
@@ -118,7 +117,7 @@ class HelloServer:
         else:
             return b'Unknown hello string'
 
-    def shutdown(self, sig=None, dummy=None):
+    def shutdown(self):
         """ Shut down the server """
         exit_code = 0
         try:
@@ -135,22 +134,41 @@ class HelloServer:
             sys.exit(exit_code)
 
 
-class HTTPServer(HelloServer):
+def get_html_from_path(path):
+    html = b''
+    try:
+        logging.debug(f'TRY OPEN FILE: {path}')
+        with open(path, 'rb') as f:
+            html = f.read()
+    except Exception as e:
+        logging.debug(f"EXCEPTION {e}")
+    return html
+
+
+def gen_headers(code, content_length, content_type):
+    """ Generates HTTP response Headers."""
+    http_statuses = {
+        200: 'HTTP/1.1 200 OK\r\n',
+        404: 'HTTP/1.1 404 Not Found\r\n',
+        405: 'HTTP/1.1 405 Method Not Allowed\r\n',
+        403: 'HTTP/1.1 403 Forbidden\r\n'
+    }
+
+    return f"{http_statuses[code]}" \
+           f"Date: {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}\r\n" \
+           f"Server: My-HTTP-Server\r\n" \
+           f"Connection: close\r\n" \
+           f"Content-Length: {content_length}\r\n" \
+           f"Content-Type: {content_type}\n\n"
+
+
+class HTTPServer(Server):
     def __init__(self, host, port, workers, document_root):
         self.document_root = document_root
         self.delimiter = b'\r\n'
         self.ender = b'\r\n\r\n'
         self.close_connection = True
         super().__init__(host, port, workers)
-
-    def _read(self, client):
-        maxsize = 65536
-        data = bytearray()
-        while self.ender not in data:
-            data += client.recv(self.read_size)
-            if len(data) > maxsize:
-                raise TypeError('HTTP request is too big')
-        return data
 
     def _get_headers(self, data):
         """Only \r\n delimiter syntax is supported
@@ -200,17 +218,7 @@ class HTTPServer(HelloServer):
 
         return headers, tuple()
 
-    def get_html_from_path(self, path):
-        html = b''
-        try:
-            logging.debug(f'TRY OPEN FILE: {path}')
-            with open(path, 'rb') as f:
-                html = f.read()
-        except Exception as e:
-            logging.debug(f"EXCEPTION {e}")
-        return html
-
-    def resolve_path(self, path: str) -> tuple:
+    def _resolve_path(self, path: str) -> tuple:
         logging.debug(f'PATH GETTED {path}')
         query = ''
         if '?' in path:
@@ -228,40 +236,24 @@ class HTTPServer(HelloServer):
         logging.debug(f'RESOLVED PATH: {path}')
         return path, query
 
-    def _gen_headers(self, code, content_length, content_type):
-        """ Generates HTTP response Headers."""
-        http_statuses = {
-            200: 'HTTP/1.1 200 OK\r\n',
-            404: 'HTTP/1.1 404 Not Found\r\n',
-            405: 'HTTP/1.1 405 Method Not Allowed\r\n',
-            403: 'HTTP/1.1 403 Forbidden\r\n'
-        }
-
-        return f"{http_statuses[code]}" \
-               f"Date: {time.strftime('%a, %d %b %Y %H:%M:%S', time.localtime())}\r\n" \
-               f"Server: My-HTTP-Server\r\n" \
-               f"Connection: close\r\n" \
-               f"Content-Length: {content_length}\r\n" \
-               f"Content-Type: {content_type}\n\n"
-
     def get_response(self, data):
         headers, error = self._get_headers(data)
         if error:
             status, text = error
             html_err = HTML_ERROR.format(status=status, text=text).encode() + b'\r\n\r\n'
-            return self._gen_headers(status, len(html_err), 'text/html').encode() + html_err
-        path, query = self.resolve_path(headers['path'])
+            return gen_headers(status, len(html_err), 'text/html').encode() + html_err
+        path, query = self._resolve_path(headers['path'])
         content_type, _ = mimetypes.guess_type(path)
 
         if headers['command'] == 'HEAD':
-            return self._gen_headers(OK, len(self.get_html_from_path(path)), content_type).encode() + b'\r\n\r\n'
+            return gen_headers(OK, len(get_html_from_path(path)), content_type).encode() + b'\r\n\r\n'
 
-        html = self.get_html_from_path(path)
+        html = get_html_from_path(path)
         if html:
-            return self._gen_headers(OK, len(html), content_type).encode() + html
+            return gen_headers(OK, len(html), content_type).encode() + html
 
         html_err = HTML_ERROR.format(status=NOT_FOUND, text='Page not found').encode()
-        return self._gen_headers(NOT_FOUND, len(html_err), 'text/html').encode() + html_err
+        return gen_headers(NOT_FOUND, len(html_err), 'text/html').encode() + html_err
 
 
 def create_parser() -> argparse.ArgumentParser:
